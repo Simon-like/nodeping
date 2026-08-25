@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="popup.css">
+<title>NodePing</title>
+</head>
+<body>
+  <div class="popup">
+    <div class="pop-head">
+      <div class="pop-title">◈ NodePing</div>
+      <div class="gear" id="openOptions" title="管理页">⚙︎</div>
+    </div>
+
+    <div class="view-tabs" id="viewTabs">
+      <button data-view="day">日</button>
+      <button data-view="week" class="active">周</button>
+      <button data-view="month">月</button>
+    </div>
+
+    <!-- 日历预览区（三视图共用容器） -->
+    <div class="cal-area" id="calArea"></div>
+
+    <!-- 日期筛选提示（点击日历某天触发） -->
+    <div class="filter-chip hidden" id="filterChip">
+      <span id="filterText"></span>
+      <button id="filterClear" title="查看全部">×</button>
+    </div>
+
+    <div class="hang-head">
+      <span class="hang-title">挂起中</span>
+      <span class="hang-count" id="hangCount">0</span>
+      <span class="hang-hint">完成或取消前不会消失</span>
+    </div>
+
+    <div class="list-wrap" id="listWrap">
+      <div class="task-list" id="taskList"></div>
+      <button class="more-hint" id="moreHint">还有 <span id="moreCount">0</span> 条 ↓</button>
+    </div>
+    <div class="empty hidden" id="emptyState">
+      <div class="empty-icon">🍃</div>
+      <div>没有挂起的节点，很清净</div>
+    </div>
+
+    <div class="pop-foot">
+      <button class="btn btn-primary" id="openEditor">＋ 新增节点</button>
+      <button class="btn btn-ghost" id="gotoOptions">管理页 →</button>
+    </div>
+
+    <!-- 轻量新增编辑器 -->
+    <div class="editor" id="editor">
+      <input class="ed-title-input" id="edTitle" placeholder="节点标题，如：支付对账上线" maxlength="40">
+      <div class="ed-row">
+        <span class="ed-label">截止</span>
+        <button class="chip" data-days="1">明天</button>
+        <button class="chip" data-days="3">3 天后</button>
+        <button class="chip" data-days="7">下周</button>
+        <input type="date" class="ed-date" id="edDate">
+      </div>
+      <div class="ed-row">
+        <span class="ed-label">项目</span>
+        <input class="ed-proj" id="edProj" placeholder="选填" maxlength="10">
+      </div>
+      <textarea class="ed-detail" id="edDetail" rows="2" placeholder="详情备注（选填，一句话即可）" maxlength="120"></textarea>
+      <div class="ed-row">
+        <span class="ed-label">链接</span>
+        <input class="ed-link-input" id="edLinkInput" placeholder="粘贴 URL，回车添加" maxlength="300">
+        <button class="chip" id="edLinkAdd">添加</button>
+      </div>
+      <div class="ed-links" id="edLinks"></div>
+      <div class="ed-actions">
+        <button class="btn btn-primary" id="edSave">挂起它</button>
+        <button class="btn btn-ghost" id="edCancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

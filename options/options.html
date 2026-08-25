@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="options.css">
+<title>NodePing · 管理页</title>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">◈ NodePing <span>管理页</span></div>
+    <button class="btn btn-primary sm" id="newTaskBtn">＋ 新增节点</button>
+  </header>
+
+  <main class="layout">
+    <!-- 左：月历 -->
+    <section class="cal-panel glass">
+      <div class="month-head">
+        <div class="month-title" id="monthTitle"></div>
+        <div class="month-nav">
+          <button id="mPrev">‹</button>
+          <button id="mToday">今天</button>
+          <button id="mNext">›</button>
+        </div>
+      </div>
+      <div class="month-grid" id="monthGrid"></div>
+    </section>
+
+    <!-- 右：任务栏 -->
+    <section class="side">
+      <div class="glass panel">
+        <div class="panel-head">
+          <span class="panel-title">挂起中</span>
+          <span class="count" id="hangCount">0</span>
+        </div>
+        <div class="rows" id="hangList"></div>
+        <div class="empty hidden" id="hangEmpty">🍃 没有挂起的节点</div>
+      </div>
+
+      <div class="glass panel">
+        <div class="panel-head">
+          <span class="panel-title">已归档</span>
+          <span class="count muted" id="archCount">0</span>
+        </div>
+        <div class="rows" id="archList"></div>
+        <div class="empty hidden" id="archEmpty">还没有完成或取消的记录</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 编辑/新增弹层 -->
+  <div class="modal-mask hidden" id="modalMask">
+    <div class="modal glass-strong">
+      <div class="modal-title" id="modalTitle">编辑节点</div>
+      <input class="f-input" id="fTitle" placeholder="节点标题（必填）" maxlength="40">
+      <div class="f-row">
+        <label>截止</label>
+        <input type="date" class="f-date" id="fDate">
+        <button class="chip" id="fClearDate">无日期</button>
+      </div>
+      <div class="f-row">
+        <label>项目</label>
+        <input class="f-input sm-flex" id="fProj" placeholder="选填" maxlength="10">
+      </div>
+      <textarea class="f-textarea" id="fDetail" rows="3" placeholder="详情备注（选填，一句话即可）" maxlength="120"></textarea>
+      <div class="f-row">
+        <label>链接</label>
+        <input class="f-input sm-flex" id="fLinkInput" placeholder="粘贴 URL，回车添加" maxlength="300">
+        <button class="chip" id="fLinkAdd">添加</button>
+      </div>
+      <div class="f-links" id="fLinks"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="fSave">保存</button>
+        <button class="btn btn-ghost" id="fCancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>
