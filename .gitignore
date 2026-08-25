@@ -1,0 +1,13 @@
+# OS / 编辑器
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# 依赖与构建产物（本项目零构建，预留）
+node_modules/
+dist/
+build/
+
+# 本地调试产物
+tools/debug-*.png

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NodePing · 原型评审 v0.2</title>
+<style>
+  :root{
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* 主题 A · 薄雾蓝（已锁定） */
+    --bg1:#dfefff; --bg2:#eef6ff; --bg3:#dbe9ff;
+    --accent:#3b82f6; --accent-soft:rgba(59,130,246,.14); --ink:#1e3a5f;
+    --warn:#f59e0b; --danger:#ef4444;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,"PingFang SC","SF Pro",sans-serif; }
+  body{
+    min-height:100vh; padding:48px 24px;
+    background:linear-gradient(135deg,var(--bg1),var(--bg2) 50%,var(--bg3));
+    color:var(--ink);
+    display:flex; flex-direction:column; align-items:center; gap:28px;
+  }
+  h1{ font-size:20px; font-weight:700; letter-spacing:.5px; }
+  .sub{ font-size:13px; opacity:.6; margin-top:-20px; text-align:center; line-height:1.7; }
+
+  .stage{ display:flex; gap:40px; flex-wrap:wrap; justify-content:center; align-items:flex-start; width:100%; max-width:1080px; }
+
+  /* ============ 浏览器工具栏模拟 ============ */
+  .toolbar-sim{ width:100%; max-width:760px; background:rgba(255,255,255,.5); backdrop-filter:blur(16px); border:1px solid rgba(255,255,255,.6); border-radius:14px; padding:10px 18px; display:flex; align-items:center; gap:14px; box-shadow:0 4px 20px rgba(31,38,135,.06); }
+  .toolbar-sim .url{ flex:1; background:rgba(255,255,255,.7); border-radius:8px; padding:6px 14px; font-size:12px; opacity:.6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ext-icon{ flex:none; position:relative; width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,var(--accent),#93c5fd); display:grid; place-items:center; color:#fff; font-size:16px; cursor:pointer; box-shadow:0 4px 12px var(--accent-soft); transition:transform .3s var(--spring); }
+  .ext-icon:hover{ transform:scale(1.12) rotate(-4deg); }
+  .badge{ position:absolute; top:-6px; right:-6px; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:var(--danger); color:#fff; font-size:10px; font-weight:700; display:grid; place-items:center; border:2px solid #fff; }
+
+  .frame-label{ font-size:12px; opacity:.5; text-align:center; margin-bottom:8px; }
+
+  /* ============ Popup 弹窗 ============ */
+  .popup{
+    width:385px; max-width:100%; border-radius:22px; padding:18px; position:relative; overflow:hidden;
+    background:rgba(255,255,255,.42); backdrop-filter:blur(28px) saturate(1.5);
+    border:1px solid rgba(255,255,255,.65);
+    box-shadow:0 20px 60px rgba(31,38,135,.14), inset 0 1px 0 rgba(255,255,255,.8);
+  }
+  .pop-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .pop-title{ font-size:16px; font-weight:700; }
+  .gear{ width:30px; height:30px; border-radius:10px; display:grid; place-items:center; background:rgba(255,255,255,.55); cursor:pointer; font-size:14px; transition:transform .5s var(--spring); }
+  .gear:hover{ transform:rotate(90deg); }
+
+  .view-tabs{ display:flex; gap:6px; background:rgba(255,255,255,.4); padding:4px; border-radius:12px; margin-bottom:14px; }
+  .view-tabs button{ flex:1; border:none; background:transparent; padding:7px 0; border-radius:9px; font-size:13px; font-weight:600; color:var(--ink); opacity:.55; cursor:pointer; transition:all .25s var(--spring); }
+  .view-tabs button.active{ background:#fff; opacity:1; box-shadow:0 3px 10px rgba(31,38,135,.12); transform:scale(1.03); }
+
+  .week-row{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px; }
+  .day{ text-align:center; padding:8px 0 10px; border-radius:12px; background:rgba(255,255,255,.35); cursor:pointer; transition:transform .25s var(--spring), background .2s; }
+  .day:hover{ transform:translateY(-3px); background:rgba(255,255,255,.6); }
+  .day .dow{ font-size:10px; opacity:.5; }
+  .day .num{ font-size:15px; font-weight:700; margin-top:2px; }
+  .day.today{ background:var(--accent); color:#fff; box-shadow:0 6px 16px var(--accent-soft); }
+  .day.today .dow{ opacity:.8; }
+  .day .marks{ display:flex; gap:3px; justify-content:center; margin-top:5px; height:5px; }
+  .day .m{ width:5px; height:5px; border-radius:50%; background:var(--accent); }
+  .day .m.warn{ background:var(--warn); } .day .m.urgent{ background:var(--danger); }
+
+  /* 挂起区标题 */
+  .hang-head{ display:flex; align-items:baseline; gap:8px; margin:12px 2px 10px; }
+  .hang-title{ font-size:12px; font-weight:700; opacity:.6; letter-spacing:1px; }
+  .hang-count{ font-size:11px; padding:1px 8px; border-radius:8px; background:var(--accent-soft); color:var(--accent); font-weight:700; }
+  .hang-hint{ font-size:10px; opacity:.4; margin-left:auto; }
+
+  /* 任务卡片 */
+  .task-list{ display:flex; flex-direction:column; gap:10px; max-height:264px; overflow-y:auto; }
+  .task{
+    display:flex; gap:12px; align-items:flex-start; padding:13px 14px;
+    background:rgba(255,255,255,.55); border:1px solid rgba(255,255,255,.7);
+    border-radius:16px; box-shadow:0 4px 14px rgba(31,38,135,.07);
+    transition:transform .3s var(--spring), opacity .4s, box-shadow .2s;
+    cursor:pointer; position:relative; overflow:hidden;
+  }
+  .task:hover{ transform:translateY(-2px) scale(1.01); box-shadow:0 8px 22px rgba(31,38,135,.12); }
+  .task.done{ opacity:.45; }
+  .task.done .t-title{ text-decoration:line-through; }
+  .task.poof{ transform:scale(.6); opacity:0; }
+  .task.overdue{ border-color:rgba(239,68,68,.35); background:rgba(255,240,240,.55); }
+  .task.overdue::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--danger); animation:pulse 1.6s ease-in-out infinite; }
+
+  .check{ flex:none; width:22px; height:22px; margin-top:2px; border-radius:50%; border:2px solid var(--accent); background:transparent; cursor:pointer; display:grid; place-items:center; transition:all .25s var(--spring); }
+  .check:hover{ transform:scale(1.2); }
+  .check.on{ background:var(--accent); }
+  .check.on::after{ content:"✓"; color:#fff; font-size:12px; font-weight:800; animation:pop .35s var(--spring); }
+  @keyframes pop{ 0%{ transform:scale(0);} 70%{ transform:scale(1.4);} 100%{ transform:scale(1);} }
+
+  .t-body{ flex:1; min-width:0; }
+  .t-title{ font-size:14px; font-weight:650; }
+  .t-desc{ font-size:12px; opacity:.55; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .t-proj{ display:inline-block; font-size:10px; font-weight:600; padding:2px 8px; border-radius:6px; background:var(--accent-soft); color:var(--accent); margin-top:6px; }
+
+  .countdown{ flex:none; text-align:right; }
+  .cd-num{ font-size:18px; font-weight:800; line-height:1; }
+  .cd-label{ font-size:10px; opacity:.5; margin-top:3px; }
+  .cd-calm .cd-num{ color:var(--accent); }
+  .cd-warn .cd-num{ color:var(--warn); }
+  .cd-urgent .cd-num{ color:var(--danger); animation:pulse 1.6s ease-in-out infinite; }
+  .cd-over .cd-num{ color:var(--danger); font-size:13px; animation:pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{ opacity:1;} 50%{ opacity:.45;} }
+
+  .pop-foot{ display:flex; gap:10px; margin-top:14px; }
+  .btn{ flex:1; border:none; padding:11px; border-radius:13px; font-size:13px; font-weight:650; cursor:pointer; transition:transform .25s var(--spring), box-shadow .2s; }
+  .btn:active{ transform:scale(.95); }
+  .btn-primary{ background:var(--accent); color:#fff; box-shadow:0 6px 18px var(--accent-soft); }
+  .btn-primary:hover{ transform:translateY(-2px); box-shadow:0 10px 24px var(--accent-soft); }
+  .btn-ghost{ background:rgba(255,255,255,.5); color:var(--ink); }
+
+  /* ============ 轻量新增编辑器（popup 内滑出） ============ */
+  .editor{
+    position:absolute; left:10px; right:10px; bottom:10px; z-index:5;
+    background:rgba(255,255,255,.72); backdrop-filter:blur(30px) saturate(1.6);
+    border:1px solid rgba(255,255,255,.8); border-radius:18px; padding:16px;
+    box-shadow:0 -10px 40px rgba(31,38,135,.18);
+    transform:translateY(calc(100% + 20px)); transition:transform .45s var(--spring);
+  }
+  .editor.open{ transform:translateY(0); }
+  .ed-title-input{ width:100%; border:none; outline:none; background:transparent; font-size:15px; font-weight:700; color:var(--ink); padding:4px 2px; }
+  .ed-title-input::placeholder{ color:var(--ink); opacity:.35; font-weight:500; }
+  .ed-row{ display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+  .ed-label{ font-size:11px; opacity:.5; font-weight:600; margin-right:2px; }
+  .chip{ border:none; padding:6px 12px; border-radius:9px; font-size:12px; font-weight:600; background:rgba(255,255,255,.6); color:var(--ink); cursor:pointer; transition:all .2s var(--spring); }
+  .chip:hover{ transform:translateY(-2px); }
+  .chip.on{ background:var(--accent); color:#fff; box-shadow:0 4px 12px var(--accent-soft); }
+  .ed-date{ border:none; background:rgba(255,255,255,.6); border-radius:9px; padding:6px 8px; font-size:12px; color:var(--ink); outline:none; font-family:inherit; }
+  .ed-detail{ width:100%; margin-top:10px; border:none; outline:none; resize:none; background:rgba(255,255,255,.45); border-radius:10px; padding:8px 10px; font-size:12px; color:var(--ink); font-family:inherit; }
+  .ed-detail::placeholder{ opacity:.5; }
+  .ed-proj{ border:none; outline:none; background:rgba(255,255,255,.6); border-radius:9px; padding:6px 10px; font-size:12px; color:var(--ink); width:110px; font-family:inherit; }
+  .ed-actions{ display:flex; gap:8px; margin-top:12px; }
+  .ed-actions .btn{ padding:9px; font-size:12px; }
+
+  /* ============ 管理页 ============ */
+  .admin{
+    width:560px; max-width:100%; border-radius:22px; padding:24px;
+    background:rgba(255,255,255,.42); backdrop-filter:blur(28px) saturate(1.5);
+    border:1px solid rgba(255,255,255,.65);
+    box-shadow:0 20px 60px rgba(31,38,135,.14), inset 0 1px 0 rgba(255,255,255,.8);
+  }
+  .month-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .month-title{ font-size:17px; font-weight:700; }
+  .month-nav{ display:flex; gap:8px; }
+  .month-nav button{ width:30px; height:30px; border:none; border-radius:9px; background:rgba(255,255,255,.55); cursor:pointer; font-size:13px; transition:transform .25s var(--spring); }
+  .month-nav button:hover{ transform:scale(1.15); }
+  .month-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+  .mg-dow{ text-align:center; font-size:11px; opacity:.5; padding:4px 0; }
+  .mg-cell{ aspect-ratio:1.35; border-radius:11px; background:rgba(255,255,255,.35); padding:6px; font-size:11px; font-weight:600; transition:transform .2s var(--spring), background .2s; cursor:pointer; }
+  .mg-cell:hover{ transform:scale(1.08); background:rgba(255,255,255,.65); z-index:1; }
+  .mg-cell.dim{ opacity:.3; }
+  .mg-cell.today{ outline:2px solid var(--accent); }
+  .mg-cell .marks{ display:flex; gap:3px; flex-wrap:wrap; margin-top:5px; }
+  .mg-cell .m{ width:6px; height:6px; border-radius:50%; background:var(--accent); }
+  .mg-cell .m.warn{ background:var(--warn); } .mg-cell .m.urgent{ background:var(--danger); }
+  .admin-list{ margin-top:18px; display:flex; flex-direction:column; gap:8px; }
+  .admin-row{ display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:13px; background:rgba(255,255,255,.5); font-size:13px; transition:transform .2s var(--spring); }
+  .admin-row:hover{ transform:translateX(4px); }
+  .admin-row .r-title{ flex:1; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .admin-row .r-date{ font-size:12px; opacity:.55; flex:none; }
+  .admin-row .r-edit{ font-size:11px; color:var(--accent); font-weight:600; cursor:pointer; flex:none; }
+
+  /* ============ 响应式 ============ */
+  @media (max-width: 960px){
+    .stage{ flex-direction:column; align-items:center; }
+    .admin{ width:min(560px, 100%); }
+  }
+  @media (max-width: 480px){
+    body{ padding:24px 12px; }
+    .popup{ width:100%; }
+    .mg-cell{ aspect-ratio:1; font-size:10px; padding:4px; }
+    .toolbar-sim .url{ font-size:11px; }
+  }
+</style>
+</head>
+<body>
+
+  <h1>NodePing · 交互原型 v0.2（评审稿）</h1>
+  <p class="sub">主题已锁定 A · 薄雾蓝｜新增「挂起模型」：任务从创建起常驻列表，逾期不消失<br>点击「＋ 新增节点」体验轻量编辑器；缩小窗口可验证响应式</p>
+
+  <!-- 工具栏 + 角标模拟 -->
+  <div class="toolbar-sim">
+    <div class="url">🔒 https://mail.google.com …</div>
+    <div class="ext-icon" title="NodePing">◈<div class="badge" id="badge">4</div></div>
+  </div>
+
+  <div class="stage">
+    <!-- Popup -->
+    <div>
+      <div class="frame-label">↓ 点击图标后的弹窗（385px）</div>
+      <div class="popup">
+        <div class="pop-head">
+          <div class="pop-title">◈ NodePing</div>
+          <div class="gear">⚙︎</div>
+        </div>
+        <div class="view-tabs">
+          <button onclick="switchView(this)">日</button>
+          <button class="active" onclick="switchView(this)">周</button>
+          <button onclick="switchView(this)">月</button>
+        </div>
+        <div class="week-row">
+          <div class="day"><div class="dow">一</div><div class="num">11</div><div class="marks"></div></div>
+          <div class="day"><div class="dow">二</div><div class="num">12</div><div class="marks"><div class="m"></div></div></div>
+          <div class="day"><div class="dow">三</div><div class="num">13</div><div class="marks"><div class="m warn"></div></div></div>
+          <div class="day"><div class="dow">四</div><div class="num">14</div><div class="marks"></div></div>
+          <div class="day"><div class="dow">五</div><div class="num">15</div><div class="marks"><div class="m urgent"></div></div></div>
+          <div class="day"><div class="dow">六</div><div class="num">16</div><div class="marks"></div></div>
+          <div class="day today"><div class="dow">日</div><div class="num">17</div><div class="marks"></div></div>
+        </div>
+
+        <div class="hang-head">
+          <span class="hang-title">挂起中</span>
+          <span class="hang-count" id="hangCount">4</span>
+          <span class="hang-hint">完成或取消前不会消失</span>
+        </div>
+        <div class="task-list" id="taskList">
+          <div class="task overdue">
+            <button class="check" onclick="toggleDone(this)"></button>
+            <div class="t-body">
+              <div class="t-title">网关限流方案评审材料</div>
+              <div class="t-desc">原定 8-15，已逾期，评审会改期未定</div>
+              <span class="t-proj">基础架构</span>
+            </div>
+            <div class="countdown cd-over"><div class="cd-num">逾期 2 天</div><div class="cd-label">08-15 截止</div></div>
+          </div>
+          <div class="task">
+            <button class="check" onclick="toggleDone(this)"></button>
+            <div class="t-body">
+              <div class="t-title">会员系统二期 · 提测</div>
+              <div class="t-desc">联调用例回归完，提测邮件发出</div>
+              <span class="t-proj">会员系统</span>
+            </div>
+            <div class="countdown cd-urgent"><div class="cd-num">2</div><div class="cd-label">天后</div></div>
+          </div>
+          <div class="task">
+            <button class="check" onclick="toggleDone(this)"></button>
+            <div class="t-body">
+              <div class="t-title">订单重构需求评审</div>
+              <div class="t-desc">评审会 14:00，先过一遍 PRD 批注</div>
+              <span class="t-proj">交易中台</span>
+            </div>
+            <div class="countdown cd-warn"><div class="cd-num">5</div><div class="cd-label">天后</div></div>
+          </div>
+          <div class="task">
+            <button class="check" onclick="toggleDone(this)"></button>
+            <div class="t-body">
+              <div class="t-title">支付对账服务上线</div>
+              <div class="t-desc">灰度 10% → 观察 2 天 → 全量</div>
+              <span class="t-proj">支付组</span>
+            </div>
+            <div class="countdown cd-calm"><div class="cd-num">11</div><div class="cd-label">天后</div></div>
+          </div>
+        </div>
+        <div class="pop-foot">
+          <button class="btn btn-primary" onclick="openEditor()">＋ 新增节点</button>
+          <button class="btn btn-ghost">管理页 →</button>
+        </div>
+
+        <!-- 轻量新增编辑器 -->
+        <div class="editor" id="editor">
+          <input class="ed-title-input" id="edTitle" placeholder="节点标题，如：支付对账上线" maxlength="40">
+          <div class="ed-row">
+            <span class="ed-label">截止</span>
+            <button class="chip" onclick="pickChip(this,1)">明天</button>
+            <button class="chip" onclick="pickChip(this,3)">3 天后</button>
+            <button class="chip" onclick="pickChip(this,7)">下周</button>
+            <input type="date" class="ed-date" id="edDate">
+          </div>
+          <div class="ed-row">
+            <span class="ed-label">项目</span>
+            <input class="ed-proj" id="edProj" placeholder="选填" maxlength="10">
+          </div>
+          <textarea class="ed-detail" id="edDetail" rows="2" placeholder="详情备注（选填，一句话即可）" maxlength="120"></textarea>
+          <div class="ed-actions">
+            <button class="btn btn-primary" onclick="saveTask()">挂起它</button>
+            <button class="btn btn-ghost" onclick="closeEditor()">取消</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 管理页 -->
+    <div>
+      <div class="frame-label">↓ 管理页（全屏页，此处缩小展示）</div>
+      <div class="admin">
+        <div class="month-head">
+          <div class="month-title">2026 年 8 月</div>
+          <div class="month-nav"><button>‹</button><button>›</button></div>
+        </div>
+        <div class="month-grid" id="monthGrid"></div>
+        <div class="admin-list">
+          <div class="admin-row"><div class="r-title" style="color:var(--danger)">网关限流方案评审材料（已逾期）</div><div class="r-date">08-15</div><div class="r-edit">编辑</div></div>
+          <div class="admin-row"><div class="r-title">会员系统二期 · 提测</div><div class="r-date">08-19</div><div class="r-edit">编辑</div></div>
+          <div class="admin-row"><div class="r-title">订单重构需求评审</div><div class="r-date">08-22</div><div class="r-edit">编辑</div></div>
+          <div class="admin-row"><div class="r-title">支付对账服务上线</div><div class="r-date">08-28</div><div class="r-edit">编辑</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  function switchView(btn){
+    btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  function toggleDone(btn){
+    const card = btn.closest('.task');
+    const badge = document.getElementById('badge');
+    const hang = document.getElementById('hangCount');
+    if(btn.classList.contains('on')){
+      btn.classList.remove('on'); card.classList.remove('done');
+      badge.textContent = +badge.textContent + 1; hang.textContent = +hang.textContent + 1;
+    }else{
+      btn.classList.add('on');
+      card.classList.add('poof');
+      badge.textContent = Math.max(0, +badge.textContent - 1);
+      hang.textContent = Math.max(0, +hang.textContent - 1);
+      setTimeout(()=>{ card.classList.remove('poof'); card.classList.add('done'); card.parentElement.appendChild(card); }, 380);
+    }
+  }
+  /* ===== 编辑器 ===== */
+  const editor = document.getElementById('editor');
+  function openEditor(){ editor.classList.add('open'); setTimeout(()=>document.getElementById('edTitle').focus(), 200); }
+  function closeEditor(){ editor.classList.remove('open'); }
+  function pickChip(btn, days){
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+    btn.classList.add('on');
+    const d = new Date(Date.now() + days*864e5);
+    document.getElementById('edDate').value = d.toISOString().slice(0,10);
+  }
+  function saveTask(){
+    const title = document.getElementById('edTitle').value.trim() || '未命名节点';
+    const dateV = document.getElementById('edDate').value;
+    const proj = document.getElementById('edProj').value.trim();
+    const desc = document.getElementById('edDetail').value.trim() || '暂无备注';
+    let cd = '<div class="cd-num">—</div><div class="cd-label">待定</div>', cls = 'cd-calm';
+    if(dateV){
+      const days = Math.round((new Date(dateV) - new Date(new Date().toDateString())) / 864e5);
+      if(days < 0){ cd = `<div class="cd-num">逾期 ${-days} 天</div><div class="cd-label">${dateV.slice(5)} 截止</div>`; cls = 'cd-over'; }
+      else { cls = days < 3 ? 'cd-urgent' : days <= 7 ? 'cd-warn' : 'cd-calm'; cd = `<div class="cd-num">${days}</div><div class="cd-label">天后</div>`; }
+    }
+    const list = document.getElementById('taskList');
+    const el = document.createElement('div');
+    el.className = 'task' + (cls==='cd-over' ? ' overdue' : '');
+    el.style.transform = 'scale(.7)'; el.style.opacity = '0';
+    el.innerHTML = `<button class="check" onclick="toggleDone(this)"></button>
+      <div class="t-body"><div class="t-title">${title}</div><div class="t-desc">${desc}</div>${proj?`<span class="t-proj">${proj}</span>`:''}</div>
+      <div class="countdown ${cls}">${cd}</div>`;
+    list.prepend(el);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{ el.style.transform=''; el.style.opacity=''; }));
+    const badge = document.getElementById('badge'), hang = document.getElementById('hangCount');
+    badge.textContent = +badge.textContent + 1; hang.textContent = +hang.textContent + 1;
+    document.getElementById('edTitle').value = ''; document.getElementById('edDetail').value = '';
+    document.getElementById('edProj').value = ''; document.getElementById('edDate').value = '';
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+    closeEditor();
+  }
+  /* 生成 8 月月历 */
+  (function(){
+    const g = document.getElementById('monthGrid');
+    ['一','二','三','四','五','六','日'].forEach(d => g.insertAdjacentHTML('beforeend', `<div class="mg-dow">${d}</div>`));
+    const marks = { 12:[''], 13:['warn'], 15:['urgent'], 19:['urgent',''], 22:['warn'], 28:[''] };
+    for(let i = 0; i < 5; i++) g.insertAdjacentHTML('beforeend', `<div class="mg-cell dim">${27+i}</div>`);
+    for(let d = 1; d <= 31; d++){
+      const ms = (marks[d]||[]).map(c => `<div class="m ${c}"></div>`).join('');
+      g.insertAdjacentHTML('beforeend', `<div class="mg-cell ${d===17?'today':''}">${d}<div class="marks">${ms}</div></div>`);
+    }
+  })();
+</script>
+</body>
+</html>
