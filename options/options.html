@@ -3,44 +3,55 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="../shared/date-picker.css">
 <link rel="stylesheet" href="options.css">
-<title>NodePing · 管理页</title>
+<title>NodePing · 管理与复盘</title>
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">◈ NodePing <span>管理页</span></div>
+    <div class="brand">◈ NodePing <span>工作节点管理</span></div>
+    <nav class="view-switch" id="viewSwitch" aria-label="管理视图">
+      <button class="active" data-view="schedule">日程管理</button>
+      <button data-view="review">统计复盘</button>
+    </nav>
     <button class="btn btn-primary sm" id="newTaskBtn">＋ 新增节点</button>
   </header>
 
-  <main class="layout">
-    <!-- 左：月历 -->
+  <div class="app-notice hidden" id="appNotice" role="status"></div>
+
+  <main class="layout" id="scheduleView">
     <section class="cal-panel glass">
       <div class="month-head">
-        <div class="month-title" id="monthTitle"></div>
+        <div>
+          <div class="eyebrow">DUE DATE MAP</div>
+          <div class="month-title" id="monthTitle"></div>
+        </div>
         <div class="month-nav">
-          <button id="mPrev">‹</button>
+          <button id="mPrev" aria-label="上个月">‹</button>
           <button id="mToday">今天</button>
-          <button id="mNext">›</button>
+          <button id="mNext" aria-label="下个月">›</button>
         </div>
       </div>
       <div class="month-grid" id="monthGrid"></div>
+      <div class="calendar-legend"><span><i class="urgent"></i>临期 / 逾期</span><span><i class="warn"></i>一周内</span><span><i></i>其他节点</span></div>
     </section>
 
-    <!-- 右：任务栏 -->
     <section class="side">
       <div class="glass panel">
         <div class="panel-head">
           <span class="panel-title">挂起中</span>
           <span class="count" id="hangCount">0</span>
+          <span class="panel-note">逾期始终钉顶</span>
         </div>
         <div class="rows" id="hangList"></div>
-        <div class="empty hidden" id="hangEmpty">🍃 没有挂起的节点</div>
+        <div class="empty hidden" id="hangEmpty">没有挂起的节点，很清净</div>
       </div>
 
       <div class="glass panel">
         <div class="panel-head">
           <span class="panel-title">已归档</span>
           <span class="count muted" id="archCount">0</span>
+          <span class="panel-note">完成或取消</span>
         </div>
         <div class="rows" id="archList"></div>
         <div class="empty hidden" id="archEmpty">还没有完成或取消的记录</div>
@@ -48,15 +59,71 @@
     </section>
   </main>
 
-  <!-- 编辑/新增弹层 -->
+  <main class="review-layout hidden" id="reviewView">
+    <section class="review-intro">
+      <div>
+        <div class="eyebrow">PERSONAL REVIEW · 基于当前记录</div>
+        <h1>复盘，不只看完成了多少。</h1>
+        <p>看看哪些节点正在积压、哪些项目最值得收束。统计范围随每项标注，不把旧归档当成全年历史。</p>
+      </div>
+      <div class="review-period">近 30 天<br><strong id="reviewDone">0</strong> 个完成</div>
+    </section>
+
+    <section class="metric-grid" aria-label="节点摘要">
+      <article class="metric"><span>当前挂起</span><strong id="metricHanging">0</strong><small>需要持续跟进</small></article>
+      <article class="metric danger"><span>已经逾期</span><strong id="metricOverdue">0</strong><small>优先处理或改期</small></article>
+      <article class="metric"><span>未来 7 天</span><strong id="metricDue">0</strong><small>含今天到期</small></article>
+      <article class="metric"><span>归档记录</span><strong id="metricArchived">0</strong><small>完成与取消合计</small></article>
+    </section>
+
+    <section class="review-grid">
+      <article class="glass review-panel weekly-panel">
+        <div class="section-head"><div><span class="eyebrow">8-WEEK RHYTHM</span><h2>最近 8 周节奏</h2></div><div class="chart-legend"><span><i></i>完成</span><span><i class="cancelled"></i>取消</span></div></div>
+        <div class="weekly-chart" id="weeklyChart"></div>
+      </article>
+      <article class="glass review-panel insight-panel">
+        <div class="eyebrow">NEXT ACTION</div><h2>这版复盘建议</h2>
+        <ol class="insight-list" id="insightList"></ol>
+        <div class="rate-block">
+          <div><span>近 30 天完成率</span><strong id="completionRate">—</strong></div>
+          <div class="rate-track"><i id="completionBar"></i></div>
+          <div class="rate-secondary"><span>按期完成率</span><strong id="onTimeRate">—</strong></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="review-grid lower-grid">
+      <article class="glass review-panel">
+        <div class="section-head"><div><span class="eyebrow">PROJECT FOCUS</span><h2>项目投入分布</h2></div><span class="section-note">挂起 + 近 30 天完成</span></div>
+        <div class="project-list" id="projectList"></div>
+      </article>
+
+      <article class="glass review-panel storage-panel" id="storagePanel">
+        <div class="section-head"><div><span class="eyebrow">SYNC STORAGE</span><h2>存储与保留</h2></div><span class="storage-state" id="storageState">正常</span></div>
+        <div class="storage-numbers"><strong id="storagePercent">0%</strong><span id="storageBytes">读取中</span></div>
+        <div class="storage-track"><i id="storageBar"></i></div>
+        <p class="storage-meta" id="storageMeta"></p>
+        <div class="setting-row">
+          <div><label for="autoCleanup">自动清理过期归档</label><small>挂起和逾期节点永不自动删除</small></div>
+          <input type="checkbox" id="autoCleanup" role="switch">
+        </div>
+        <div class="setting-row">
+          <div><label for="retentionDays">归档保留时长</label><small>从完成或取消之日起计算</small></div>
+          <select id="retentionDays"><option value="30">30 天</option><option value="90">90 天</option><option value="180">180 天</option><option value="365">365 天</option></select>
+        </div>
+        <div class="storage-actions"><button class="btn btn-ghost" id="cleanupExpiredBtn">立即清理过期归档</button><button class="text-danger" id="cleanupAllBtn">清空全部归档</button></div>
+      </article>
+    </section>
+    <p class="stats-footnote">统计基于当前同步记录；删除或到期清理的归档不再计入。完成率 = 完成 ÷（完成 + 取消），按期率不统计无截止日期节点。</p>
+  </main>
+
   <div class="modal-mask hidden" id="modalMask">
-    <div class="modal glass-strong">
+    <div class="modal glass-strong" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-title" id="modalTitle">编辑节点</div>
       <input class="f-input" id="fTitle" placeholder="节点标题（必填）" maxlength="40">
       <div class="f-row">
         <label>截止</label>
-        <input type="date" class="f-date" id="fDate">
-        <button class="chip" id="fClearDate">无日期</button>
+        <div class="date-picker-wrap" id="fDatePicker"></div>
       </div>
       <div class="f-row">
         <label>项目</label>
@@ -69,6 +136,7 @@
         <button class="chip" id="fLinkAdd">添加</button>
       </div>
       <div class="f-links" id="fLinks"></div>
+      <div class="form-error hidden" id="modalError" role="alert"></div>
       <div class="modal-actions">
         <button class="btn btn-primary" id="fSave">保存</button>
         <button class="btn btn-ghost" id="fCancel">取消</button>

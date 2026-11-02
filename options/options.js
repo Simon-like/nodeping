@@ -1,20 +1,31 @@
-// NodePing 管理页逻辑：月历总览 + 完整 CRUD + 归档恢复
+// NodePing 管理页：月历 CRUD + 归档恢复 + 统计复盘 + 存储维护
 import {
   getTasks, addTask, updateTask, setStatus, deleteTask,
   todayStr, toDateStr, daysUntil, urgencyOf, sortHanging,
+  getStorageInfo, storageErrorMessage, runStorageMaintenance,
 } from '../shared/store.js';
 import { escapeHtml, normalizeUrl, domainOf, faviconUrl } from '../shared/ui.js';
+import { createDatePicker } from '../shared/date-picker.js';
+import { initDashboard, renderDashboard } from './dashboard.js';
 
 const $ = sel => document.querySelector(sel);
 const DOW = ['一', '二', '三', '四', '五', '六', '日'];
+const state = { cursor: new Date(), selectedDate: null, tasks: [], editingId: null, pendingLinks: [] };
+let noticeTimer;
+const datePicker = createDatePicker($('#fDatePicker'));
 
-const state = {
-  cursor: new Date(),
-  selectedDate: null,
-  tasks: [],
-  editingId: null,    // null = 新增模式
-  pendingLinks: [],   // 弹层中待保存的链接
-};
+function showNotice(message, type = 'error') {
+  clearTimeout(noticeTimer);
+  const notice = $('#appNotice');
+  notice.textContent = message;
+  notice.className = `app-notice ${type}`;
+  if (type === 'success') noticeTimer = setTimeout(() => notice.classList.add('hidden'), 3500);
+}
+
+function showModalError(message = '') {
+  $('#modalError').textContent = message;
+  $('#modalError').classList.toggle('hidden', !message);
+}
 
 function linkChipHtml(l) {
   const label = l.title || domainOf(l.url);
@@ -22,9 +33,18 @@ function linkChipHtml(l) {
 }
 
 async function refresh() {
-  state.tasks = await getTasks();
-  renderMonth();
-  renderLists();
+  try {
+    state.tasks = await getTasks();
+    renderMonth();
+    renderLists();
+    await renderDashboard(state.tasks);
+    const info = await getStorageInfo();
+    if (info.usageRatio >= .85) {
+      showNotice(`同步存储已使用 ${Math.round(info.usageRatio * 100)}%，建议到「统计复盘 → 存储与保留」清理旧归档。`, 'warning');
+    }
+  } catch (error) {
+    showNotice(storageErrorMessage(error), 'error');
+  }
 }
 
 /* ============ 月历 ============ */
@@ -34,12 +54,10 @@ function renderMonth() {
   const first = new Date(y, m, 1);
   const lead = (first.getDay() + 6) % 7;
   const daysInMonth = new Date(y, m + 1, 0).getDate();
-
   let html = DOW.map(d => `<div class="mg-dow">${d}</div>`).join('');
   for (let i = lead; i > 0; i--) html += cell(new Date(y, m, 1 - i), true);
   for (let d = 1; d <= daysInMonth; d++) html += cell(new Date(y, m, d), false);
   $('#monthGrid').innerHTML = html;
-
   $('#monthGrid').querySelectorAll('[data-date]').forEach(el => {
     el.onclick = () => {
       const ds = el.dataset.date;
@@ -52,18 +70,16 @@ function renderMonth() {
 
 function cell(d, dim) {
   const ds = toDateStr(d);
-  const marks = dim ? '' : state.tasks
-    .filter(t => t.status === 'hanging' && t.dueDate === ds)
-    .map(t => {
-      const u = urgencyOf(t);
-      const cls = u === 'overdue' || u === 'urgent' ? 'urgent' : u === 'warn' ? 'warn' : '';
-      return `<div class="m ${cls}"></div>`;
-    }).join('');
+  const marks = dim ? '' : state.tasks.filter(t => t.status === 'hanging' && t.dueDate === ds).map(t => {
+    const u = urgencyOf(t);
+    const cls = u === 'overdue' || u === 'urgent' ? 'urgent' : u === 'warn' ? 'warn' : '';
+    return `<div class="m ${cls}"></div>`;
+  }).join('');
   const cls = ['mg-cell'];
   if (dim) cls.push('dim');
   if (ds === todayStr()) cls.push('today');
   if (state.selectedDate === ds) cls.push('selected');
-  return `<button class="${cls.join(' ')}" data-date="${ds}">${d.getDate()}<div class="marks">${marks}</div></button>`;
+  return `<button class="${cls.join(' ')}" data-date="${ds}" aria-label="${ds}">${d.getDate()}<div class="marks">${marks}</div></button>`;
 }
 
 /* ============ 任务列表 ============ */
@@ -78,9 +94,7 @@ function metaLine(t) {
     else if (d !== null) parts.push(`${d} 天后`);
   } else if (t.status === 'done' && t.completedAt) {
     parts.push(`完成于 ${toDateStr(new Date(t.completedAt)).slice(5).replace('-', '/')}`);
-  } else if (t.status === 'cancelled') {
-    parts.push('已取消');
-  }
+  } else if (t.status === 'cancelled') parts.push('已取消');
   if (t.project) parts.push(`<span class="tag">${escapeHtml(t.project)}</span>`);
   return parts.join(' · ');
 }
@@ -88,52 +102,34 @@ function metaLine(t) {
 function hangRow(t) {
   const overdue = urgencyOf(t) === 'overdue';
   return `<div class="row ${overdue ? 'overdue' : ''}" data-id="${t.id}">
-    <div class="r-main">
-      <div class="r-title">${escapeHtml(t.title)}</div>
-      <div class="r-meta">${metaLine(t)}</div>
-      ${(t.links || []).length ? `<div class="r-links">${t.links.map(linkChipHtml).join('')}</div>` : ''}
-    </div>
-    <div class="r-act">
-      <button class="ok" data-act="done">完成</button>
-      <button data-act="edit">编辑</button>
-      <button class="danger" data-act="cancel">取消</button>
-    </div>
+    <div class="r-main"><div class="r-title">${escapeHtml(t.title)}</div><div class="r-meta">${metaLine(t)}</div>
+      ${(t.links || []).length ? `<div class="r-links">${t.links.map(linkChipHtml).join('')}</div>` : ''}</div>
+    <div class="r-act"><button class="ok" data-act="done">完成</button><button data-act="edit">编辑</button><button class="danger" data-act="cancel">取消</button></div>
   </div>`;
 }
 
 function archRow(t) {
   return `<div class="row arch ${t.status === 'cancelled' ? 'cancelled' : ''}" data-id="${t.id}">
-    <div class="r-main">
-      <div class="r-title">${escapeHtml(t.title)}</div>
-      <div class="r-meta">${metaLine(t)}</div>
-      ${(t.links || []).length ? `<div class="r-links">${t.links.map(linkChipHtml).join('')}</div>` : ''}
-    </div>
-    <div class="r-act">
-      <button class="ok" data-act="restore">恢复</button>
-      <button class="danger" data-act="delete">删除</button>
-    </div>
+    <div class="r-main"><div class="r-title">${escapeHtml(t.title)}</div><div class="r-meta">${metaLine(t)}</div>
+      ${(t.links || []).length ? `<div class="r-links">${t.links.map(linkChipHtml).join('')}</div>` : ''}</div>
+    <div class="r-act"><button class="ok" data-act="restore">恢复</button><button class="danger" data-act="delete">删除</button></div>
   </div>`;
 }
 
 function renderLists() {
   let hanging = sortHanging(state.tasks.filter(t => t.status === 'hanging'));
-  if (state.selectedDate) {
-    hanging = hanging.filter(t => t.dueDate === state.selectedDate || urgencyOf(t) === 'overdue');
-  }
+  if (state.selectedDate) hanging = hanging.filter(t => t.dueDate === state.selectedDate || urgencyOf(t) === 'overdue');
   const allHanging = state.tasks.filter(t => t.status === 'hanging');
-  const archived = state.tasks
-    .filter(t => t.status !== 'hanging')
-    .sort((a, b) => (b.completedAt || b.createdAt) - (a.completedAt || a.createdAt));
-
+  const archived = state.tasks.filter(t => t.status !== 'hanging')
+    .sort((a, b) => (b.archivedAt || b.completedAt || b.createdAt) - (a.archivedAt || a.completedAt || a.createdAt));
   $('#hangCount').textContent = allHanging.length;
   $('#archCount').textContent = archived.length;
   $('#hangList').innerHTML = hanging.map(hangRow).join('');
   $('#archList').innerHTML = archived.map(archRow).join('');
   $('#hangEmpty').classList.toggle('hidden', hanging.length > 0);
   $('#archEmpty').classList.toggle('hidden', archived.length > 0);
-
-  $('#hangList').querySelectorAll('.row').forEach(row => bindRow(row));
-  $('#archList').querySelectorAll('.row').forEach(row => bindRow(row));
+  $('#hangList').querySelectorAll('.row').forEach(bindRow);
+  $('#archList').querySelectorAll('.row').forEach(bindRow);
 }
 
 function bindRow(row) {
@@ -141,14 +137,19 @@ function bindRow(row) {
   row.querySelectorAll('[data-act]').forEach(btn => {
     btn.onclick = async () => {
       const act = btn.dataset.act;
-      if (act === 'done') await setStatus(id, 'done');
-      else if (act === 'cancel') await setStatus(id, 'cancelled');
-      else if (act === 'restore') await setStatus(id, 'hanging');
-      else if (act === 'delete') {
-        if (confirm('彻底删除这条节点记录？')) await deleteTask(id);
+      if (act === 'edit') { openModal(id); return; }
+      if (act === 'delete' && !confirm('彻底删除这条节点记录？')) return;
+      btn.disabled = true;
+      try {
+        if (act === 'done') await setStatus(id, 'done');
+        else if (act === 'cancel') await setStatus(id, 'cancelled');
+        else if (act === 'restore') await setStatus(id, 'hanging');
+        else if (act === 'delete') await deleteTask(id);
+        await refresh();
+      } catch (error) {
+        showNotice(storageErrorMessage(error), 'error');
+        btn.disabled = false;
       }
-      else if (act === 'edit') { openModal(id); return; }
-      await refresh();
     };
   });
 }
@@ -156,14 +157,12 @@ function bindRow(row) {
 /* ============ 编辑 / 新增弹层 ============ */
 function renderPendingLinks() {
   $('#fLinks').innerHTML = state.pendingLinks.map((l, i) =>
-    `<span class="f-link-chip"><span>${escapeHtml(l.title || domainOf(l.url))}</span><button data-i="${i}" title="移除">×</button></span>`
-  ).join('');
+    `<span class="f-link-chip"><span>${escapeHtml(l.title || domainOf(l.url))}</span><button data-i="${i}" title="移除">×</button></span>`).join('');
   $('#fLinks').querySelectorAll('button').forEach(btn => {
     btn.onclick = () => { state.pendingLinks.splice(Number(btn.dataset.i), 1); renderPendingLinks(); };
   });
 }
 
-/** 首次添加链接时申请跨域抓取权限（用于获取链接标题）；拒绝不阻塞添加 */
 async function ensureHostPermission() {
   try {
     const origins = ['http://*/*', 'https://*/*'];
@@ -179,7 +178,7 @@ async function addPendingLink() {
   state.pendingLinks.push({ url, title: null, fetchedAt: null });
   $('#fLinkInput').value = '';
   renderPendingLinks();
-  ensureHostPermission(); // 用户手势内触发权限申请，不 await
+  ensureHostPermission();
 }
 
 function openModal(id = null) {
@@ -189,15 +188,17 @@ function openModal(id = null) {
   renderPendingLinks();
   $('#modalTitle').textContent = t ? '编辑节点' : '新增节点';
   $('#fTitle').value = t ? t.title : '';
-  $('#fDate').value = t && t.dueDate ? t.dueDate : '';
+  datePicker.setValue(t?.dueDate || null);
   $('#fProj').value = t ? t.project : '';
   $('#fDetail').value = t ? t.detail : '';
   $('#fLinkInput').value = '';
+  showModalError();
   $('#modalMask').classList.remove('hidden');
   setTimeout(() => $('#fTitle').focus(), 60);
 }
 
 function closeModal() {
+  datePicker.close();
   state.editingId = null;
   state.pendingLinks = [];
   $('#modalMask').classList.add('hidden');
@@ -206,42 +207,44 @@ function closeModal() {
 async function saveModal() {
   const title = $('#fTitle').value.trim();
   if (!title) { $('#fTitle').focus(); return; }
-  // 输入框里残留未确认的 URL 也一并收纳
   const leftover = normalizeUrl($('#fLinkInput').value);
-  if (leftover && !state.pendingLinks.some(l => l.url === leftover)) {
-    state.pendingLinks.push({ url: leftover, title: null, fetchedAt: null });
+  if (leftover && !state.pendingLinks.some(l => l.url === leftover)) state.pendingLinks.push({ url: leftover, title: null, fetchedAt: null });
+  const patch = { title, detail: $('#fDetail').value.trim(), project: $('#fProj').value.trim(), dueDate: datePicker.getValue(), links: state.pendingLinks };
+  $('#fSave').disabled = true;
+  $('#fSave').textContent = '保存中…';
+  showModalError();
+  try {
+    if (state.editingId) await updateTask(state.editingId, patch);
+    else await addTask(patch);
+    closeModal();
+    await refresh();
+  } catch (error) {
+    showModalError(storageErrorMessage(error));
+  } finally {
+    $('#fSave').disabled = false;
+    $('#fSave').textContent = '保存';
   }
-  const patch = {
-    title,
-    detail: $('#fDetail').value.trim(),
-    project: $('#fProj').value.trim(),
-    dueDate: $('#fDate').value || null,
-    links: state.pendingLinks,
-  };
-  if (state.editingId) await updateTask(state.editingId, patch);
-  else await addTask(patch);
-  closeModal();
-  await refresh();
 }
 
 /* ============ 事件绑定 ============ */
 $('#mPrev').onclick = () => { state.cursor.setMonth(state.cursor.getMonth() - 1); renderMonth(); };
 $('#mNext').onclick = () => { state.cursor.setMonth(state.cursor.getMonth() + 1); renderMonth(); };
 $('#mToday').onclick = () => { state.cursor = new Date(); state.selectedDate = todayStr(); renderMonth(); renderLists(); };
-
-$('#newTaskBtn').onclick = () => openModal(null);
+$('#viewSwitch').querySelectorAll('button').forEach(btn => {
+  btn.onclick = () => {
+    $('#viewSwitch').querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+    $('#scheduleView').classList.toggle('hidden', btn.dataset.view !== 'schedule');
+    $('#reviewView').classList.toggle('hidden', btn.dataset.view !== 'review');
+  };
+});
+$('#newTaskBtn').onclick = () => openModal();
 $('#fSave').onclick = saveModal;
 $('#fCancel').onclick = closeModal;
-$('#fClearDate').onclick = () => { $('#fDate').value = ''; };
 $('#fLinkAdd').onclick = addPendingLink;
-$('#fLinkInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); addPendingLink(); }
-});
+$('#fLinkInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addPendingLink(); } });
 $('#modalMask').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modalMask').classList.contains('hidden')) closeModal(); });
+chrome.storage.onChanged.addListener((changes, area) => { if (area === 'sync') refresh(); });
 
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'sync') refresh();
-});
-
-refresh();
+initDashboard({ onDataChanged: refresh, notify: showNotice });
+runStorageMaintenance().catch(error => showNotice(storageErrorMessage(error), 'error')).finally(refresh);

@@ -1,11 +1,19 @@
 // NodePing Popup 逻辑
 import {
   getTasks, addTask, updateTask, setStatus,
-  todayStr, toDateStr, parseDate, daysUntil, urgencyOf, sortHanging,
+  todayStr, toDateStr, daysUntil, urgencyOf, sortHanging,
+  getStorageInfo, storageErrorMessage,
 } from '../shared/store.js';
 import { escapeHtml, renderTextWithLinks, normalizeUrl, domainOf, faviconUrl } from '../shared/ui.js';
+import { createDatePicker } from '../shared/date-picker.js';
 
 const $ = sel => document.querySelector(sel);
+const datePicker = createDatePicker($('#edDatePicker'), { compact: true });
+
+function showEditorError(message = '') {
+  $('#edError').textContent = message;
+  $('#edError').classList.toggle('hidden', !message);
+}
 
 const state = {
   view: 'week',          // day | week | month
@@ -18,9 +26,18 @@ const state = {
 
 /* ============ 渲染入口 ============ */
 async function refresh() {
-  state.tasks = await getTasks();
-  renderCalendar();
-  renderList();
+  try {
+    state.tasks = await getTasks();
+    renderCalendar();
+    renderList();
+    const info = await getStorageInfo();
+    const warning = info.usageRatio >= .85;
+    $('#storageNotice').classList.toggle('hidden', !warning);
+    if (warning) $('#storageNotice').textContent = `同步存储已使用 ${Math.round(info.usageRatio * 100)}%，点击前往管理页清理旧归档。`;
+  } catch (error) {
+    $('#storageNotice').textContent = storageErrorMessage(error);
+    $('#storageNotice').classList.remove('hidden');
+  }
 }
 
 /* ============ 日历三视图 ============ */
@@ -188,8 +205,15 @@ function renderList() {
       const btn = card.querySelector('.check');
       btn.classList.add('on');
       card.classList.add('poof');
-      await setStatus(id, 'done');
-      setTimeout(refresh, 380);
+      try {
+        await setStatus(id, 'done');
+        setTimeout(refresh, 380);
+      } catch (error) {
+        btn.classList.remove('on');
+        card.classList.remove('poof');
+        $('#storageNotice').textContent = storageErrorMessage(error);
+        $('#storageNotice').classList.remove('hidden');
+      }
     };
     // 点击卡片主体 → 进入编辑态；卡片内的链接点击不下发编辑
     card.querySelector('.t-body').onclick = () => {
@@ -229,11 +253,9 @@ $('#moreHint').addEventListener('click', () => {
 const editor = $('#editor');
 
 function openEditor() {
-  state.editingId = null;
-  state.pendingLinks = [];
-  renderPendingLinks();
-  $('#edSave').textContent = '挂起它';
+  resetEditor();
   editor.classList.add('open');
+  $('.popup').classList.add('editor-open');
   setTimeout(() => $('#edTitle').focus(), 200);
 }
 
@@ -245,22 +267,28 @@ function openEditorFor(task) {
   $('#edTitle').value = task.title;
   $('#edDetail').value = task.detail || '';
   $('#edProj').value = task.project || '';
-  $('#edDate').value = task.dueDate || '';
+  datePicker.setValue(task.dueDate || null);
   $('#edLinkInput').value = '';
-  document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+  showEditorError();
   $('#edSave').textContent = '保存';
   editor.classList.add('open');
+  $('.popup').classList.add('editor-open');
   setTimeout(() => $('#edTitle').focus(), 200);
 }
-function closeEditor() { editor.classList.remove('open'); }
+function closeEditor() {
+  datePicker.close();
+  editor.classList.remove('open');
+  $('.popup').classList.remove('editor-open');
+}
 function resetEditor() {
   state.editingId = null;
   state.pendingLinks = [];
   renderPendingLinks();
   $('#edSave').textContent = '挂起它';
   $('#edTitle').value = ''; $('#edDetail').value = '';
-  $('#edProj').value = ''; $('#edDate').value = ''; $('#edLinkInput').value = '';
-  document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+  $('#edProj').value = ''; $('#edLinkInput').value = '';
+  datePicker.setValue(null);
+  showEditorError();
 }
 
 /* ---- 链接管理 ---- */
@@ -292,20 +320,9 @@ async function addPendingLink() {
   ensureHostPermission(); // 用户手势内触发权限申请，不 await
 }
 
-// 仅日期快捷芯片参与选期（链接“添加”按钮也有 .chip，需排除）
-document.querySelectorAll('.chip[data-days]').forEach(chip => {
-  chip.onclick = () => {
-    document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
-    chip.classList.add('on');
-    const d = new Date(Date.now() + Number(chip.dataset.days) * 864e5);
-    $('#edDate').value = toDateStr(d);
-  };
-});
-
 async function saveFromEditor() {
   const title = $('#edTitle').value.trim();
   if (!title) { $('#edTitle').focus(); return; }
-  // 输入框里残留未确认的 URL 也一并收纳
   const leftover = normalizeUrl($('#edLinkInput').value);
   if (leftover && !state.pendingLinks.some(l => l.url === leftover)) {
     state.pendingLinks.push({ url: leftover, title: null, fetchedAt: null });
@@ -314,14 +331,25 @@ async function saveFromEditor() {
     title,
     detail: $('#edDetail').value,
     project: $('#edProj').value,
-    dueDate: $('#edDate').value || null,
+    dueDate: datePicker.getValue(),
     links: state.pendingLinks,
   };
-  if (state.editingId) await updateTask(state.editingId, payload);
-  else await addTask(payload);
-  resetEditor();
-  closeEditor();
-  await refresh();
+  const saveButton = $('#edSave');
+  saveButton.disabled = true;
+  saveButton.textContent = '保存中…';
+  showEditorError();
+  try {
+    if (state.editingId) await updateTask(state.editingId, payload);
+    else await addTask(payload);
+    resetEditor();
+    closeEditor();
+    await refresh();
+  } catch (error) {
+    showEditorError(storageErrorMessage(error));
+  } finally {
+    saveButton.disabled = false;
+    saveButton.textContent = state.editingId ? '保存' : '挂起它';
+  }
 }
 
 /* ============ 事件绑定 ============ */
@@ -337,6 +365,7 @@ $('#edLinkInput').addEventListener('keydown', e => {
 const openOptions = () => chrome.runtime.openOptionsPage();
 $('#openOptions').onclick = openOptions;
 $('#gotoOptions').onclick = openOptions;
+$('#storageNotice').onclick = openOptions;
 
 $('#viewTabs').querySelectorAll('button').forEach(btn => {
   btn.onclick = () => {

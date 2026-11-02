@@ -1,5 +1,5 @@
 // NodePing Service Worker：角标维护 + 每日刷新 + 链接标题抓取
-import { getTasks, saveTasks, badgeInfo } from '../shared/store.js';
+import { getTasks, saveTasks, badgeInfo, runStorageMaintenance } from '../shared/store.js';
 
 const DAILY_ALARM = 'nodeping-daily-refresh';
 
@@ -104,9 +104,15 @@ async function scanLinkTitles() {
 }
 
 /* ============ 事件 ============ */
-chrome.runtime.onInstalled.addListener(() => { ensureDailyAlarm(); updateBadge(); scheduleLinkScan(); });
-chrome.runtime.onStartup.addListener(() => { ensureDailyAlarm(); updateBadge(); scheduleLinkScan(); });
-chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name === DAILY_ALARM) updateBadge(); });
+function maintainStorage() {
+  runStorageMaintenance().catch(() => { /* 下轮启动或定时任务重试 */ });
+}
+
+chrome.runtime.onInstalled.addListener(() => { ensureDailyAlarm(); maintainStorage(); updateBadge(); scheduleLinkScan(); });
+chrome.runtime.onStartup.addListener(() => { ensureDailyAlarm(); maintainStorage(); updateBadge(); scheduleLinkScan(); });
+chrome.alarms.onAlarm.addListener(alarm => {
+  if (alarm.name === DAILY_ALARM) { maintainStorage(); updateBadge(); }
+});
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'sync') return;

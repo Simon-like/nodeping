@@ -59,7 +59,7 @@ const mockTasks = [
   const m2 = await page.evaluate(() => ({
     editorOpen: document.querySelector('#editor').classList.contains('open'),
     titleVal: document.querySelector('#edTitle').value,
-    dateVal: document.querySelector('#edDate').value,
+    dateLabel: document.querySelector('#edDatePicker .dp-value').textContent,
     saveBtn: document.querySelector('#edSave').textContent,
     pendingChips: document.querySelectorAll('.ed-link-chip').length,
   }));
