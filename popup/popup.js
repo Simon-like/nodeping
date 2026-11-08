@@ -8,7 +8,7 @@ import { escapeHtml, renderTextWithLinks, normalizeUrl, domainOf, faviconUrl } f
 import { createDatePicker } from '../shared/date-picker.js';
 
 const $ = sel => document.querySelector(sel);
-const datePicker = createDatePicker($('#edDatePicker'), { compact: true });
+const datePicker = createDatePicker($('#edDatePicker'), { compact: true, inline: true });
 
 function showEditorError(message = '') {
   $('#edError').textContent = message;

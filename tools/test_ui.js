@@ -85,7 +85,12 @@ try {
   const popup = await createPage(browser, 'popup/popup.html');
   await popup.page.click('#openEditor');
   await popup.page.click('#edDatePicker .dp-trigger');
-  await popup.page.waitForTimeout(250);
+  await popup.page.waitForTimeout(500);
+  const headerBounds = await popup.page.locator('.pop-head').boundingBox();
+  const triggerBounds = await popup.page.locator('#edDatePicker .dp-trigger').boundingBox();
+  const panelBounds = await popup.page.locator('#edDatePicker .dp-panel').boundingBox();
+  assert.ok(panelBounds.y >= triggerBounds.y + triggerBounds.height, '月历必须从日期栏下方向下展开');
+  assert.ok(panelBounds.y >= headerBounds.y + headerBounds.height, '月历不得遮挡顶栏');
   const lastDayBounds = await popup.page.locator('#edDatePicker .dp-day').last().boundingBox();
   assert.ok(lastDayBounds.y >= 0 && lastDayBounds.y + lastDayBounds.height <= 600, '月历最后一天必须完整可见');
   await popup.page.screenshot({ path: path.join(ROOT, 'tools/debug-date.png') });

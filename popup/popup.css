@@ -155,15 +155,21 @@ body{
 /* ---- 滑出编辑器 ---- */
 .editor{
   position:absolute; left:10px; right:10px; bottom:10px; z-index:5;
-  background:rgba(255,255,255,.78); backdrop-filter:blur(30px) saturate(1.6);
+  max-height:520px; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain;
+  background:rgba(255,255,255,.92); backdrop-filter:blur(30px) saturate(1.6);
   border:1px solid rgba(255,255,255,.85); border-radius:18px; padding:16px;
   box-shadow:0 -10px 40px rgba(31,38,135,.18);
   transform:translateY(calc(100% + 20px)); transition:transform .45s var(--spring);
+  scrollbar-width:thin; scrollbar-color:rgba(59,130,246,.4) transparent;
 }
+.editor::-webkit-scrollbar{ width:5px; }
+.editor::-webkit-scrollbar-thumb{ background:rgba(59,130,246,.4); border-radius:5px; }
 .editor.open{ transform:translateY(0); }
 .ed-title-input{ width:100%; border:none; outline:none; background:transparent; font-size:15px; font-weight:700; color:var(--ink); padding:4px 2px; }
 .ed-title-input::placeholder{ color:var(--ink); opacity:.35; font-weight:500; }
 .ed-row{ display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+.ed-date-row{ align-items:flex-start; }
+.ed-date-row .ed-label{ padding-top:10px; }
 .ed-label{ font-size:11px; opacity:.5; font-weight:600; margin-right:2px; }
 .chip{ border:none; padding:6px 12px; border-radius:9px; font-size:12px; font-weight:600; background:rgba(255,255,255,.6); color:var(--ink); cursor:pointer; transition:all .2s var(--spring); }
 .chip:hover{ transform:translateY(-2px); }
@@ -198,5 +204,5 @@ body{
 .storage-notice{ width:100%; margin:-4px 0 12px; padding:9px 11px; border:1px solid rgba(239,68,68,.22); border-radius:10px; background:rgba(255,240,240,.8); color:#b92c2c; font-size:11px; font-weight:600; line-height:1.5; text-align:left; cursor:pointer; }
 .ed-date-picker{ flex:1; min-width:0; }
 .ed-date-picker .dp-host{ width:100%; }
-.ed-date-picker .dp-panel{ width:300px; top:auto; bottom:calc(100% + 8px); }
+.ed-date-picker .dp-panel{ width:100%; }
 .ed-error{ margin-top:10px; padding:8px 10px; border-radius:9px; background:#fff0f0; color:#b92c2c; font-size:11px; line-height:1.55; }

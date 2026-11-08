@@ -17,13 +17,14 @@ function labelFor(value) {
   return `${d.getMonth() + 1} 月 ${d.getDate()} 日 · 周${DOW[(d.getDay() + 6) % 7]}`;
 }
 
-export function createDatePicker(host, { value = null, onChange = () => {}, compact = false } = {}) {
+export function createDatePicker(host, { value = null, onChange = () => {}, compact = false, inline = false } = {}) {
   let selected = value || null;
   let cursor = selected ? parseDate(selected) : new Date();
   let isOpen = false;
 
   host.classList.add('dp-host');
   host.classList.toggle('dp-compact', compact);
+  host.classList.toggle('dp-inline', inline);
   host.innerHTML = `
     <button type="button" class="dp-trigger" aria-haspopup="dialog" aria-expanded="false">
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2.5v3M15 2.5v3M3 7.5h14M4.5 4h11A1.5 1.5 0 0 1 17 5.5v10a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 15.5v-10A1.5 1.5 0 0 1 4.5 4Z"/></svg>
@@ -63,6 +64,7 @@ export function createDatePicker(host, { value = null, onChange = () => {}, comp
     render();
     panel.classList.remove('hidden');
     trigger.setAttribute('aria-expanded', 'true');
+    if (inline) requestAnimationFrame(() => panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
   }
 
   function choose(next) {
