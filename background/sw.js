@@ -1,5 +1,6 @@
 // NodePing Service Worker：角标维护 + 每日刷新 + 链接标题抓取
-import { getTasks, saveTasks, badgeInfo, runStorageMaintenance } from '../shared/store.js';
+import { getTasks, saveTasks, runStorageMaintenance } from '../shared/store.js';
+import { syncActionBadge } from '../shared/badge.js';
 
 const DAILY_ALARM = 'nodeping-daily-refresh';
 
@@ -7,11 +8,7 @@ const DAILY_ALARM = 'nodeping-daily-refresh';
 async function updateBadge() {
   try {
     const tasks = await getTasks();
-    const { count, hasOverdue } = badgeInfo(tasks);
-    await chrome.action.setBadgeText({ text: count > 0 ? String(count) : '' });
-    await chrome.action.setBadgeBackgroundColor({
-      color: hasOverdue ? '#ef4444' : '#3b82f6',
-    });
+    await syncActionBadge(tasks);
   } catch (e) {
     // 存储读取失败时静默，避免 SW 崩溃
   }
@@ -107,6 +104,9 @@ async function scanLinkTitles() {
 function maintainStorage() {
   runStorageMaintenance().catch(() => { /* 下轮启动或定时任务重试 */ });
 }
+
+// SW 可能因任意事件被重新唤醒；每次启动都恢复一次徽标。
+updateBadge();
 
 chrome.runtime.onInstalled.addListener(() => { ensureDailyAlarm(); maintainStorage(); updateBadge(); scheduleLinkScan(); });
 chrome.runtime.onStartup.addListener(() => { ensureDailyAlarm(); maintainStorage(); updateBadge(); scheduleLinkScan(); });

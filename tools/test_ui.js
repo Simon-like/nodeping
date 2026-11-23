@@ -34,12 +34,15 @@ const task = (id, extra = {}) => ({
 const mockTasks = [
   task('overdue', { title: '支付对账上线', dueDate: date(-2) }),
   task('soon', { title: '模板二期评审', dueDate: date(3), project: '运营平台' }),
+  task('third', { title: '第三个挂起节点', dueDate: date(4) }),
+  task('fourth', { title: '第四个挂起节点', dueDate: date(5) }),
+  task('fifth', { title: '第五个挂起节点', dueDate: date(6) }),
   task('done', { title: '已完成节点', status: 'done', dueDate: date(-1), completedAt: now - DAY, archivedAt: now - DAY }),
   task('expired', { title: '过期归档', status: 'done', completedAt: now - 120 * DAY, archivedAt: now - 120 * DAY }),
 ];
 
 async function createPage(browser, file) {
-  const viewport = file.startsWith('popup/') ? { width: 385, height: 700 } : { width: 1280, height: 900 };
+  const viewport = file.startsWith('popup/') ? { width: 385, height: 600 } : { width: 1280, height: 900 };
   const context = await browser.newContext({ viewport });
   await context.addInitScript(tasks => {
     const data = {
@@ -50,6 +53,10 @@ async function createPage(browser, file) {
     window.__failWrites = false;
     window.chrome = {
       runtime: { id: 'nodeping-test', openOptionsPage() {} },
+      action: {
+        async setBadgeText({ text }) { window.__badgeText = text; },
+        async setBadgeBackgroundColor({ color }) { window.__badgeColor = color; },
+      },
       storage: {
         sync: {
           QUOTA_BYTES: 102400,
@@ -83,6 +90,24 @@ async function createPage(browser, file) {
 const browser = await chromium.launch({ headless: true });
 try {
   const popup = await createPage(browser, 'popup/popup.html');
+  const popupLayout = await popup.page.evaluate(() => {
+    const root = document.documentElement;
+    const list = document.querySelector('#taskList');
+    const footer = document.querySelector('.pop-foot').getBoundingClientRect();
+    return {
+      rootScrollable: root.scrollHeight > root.clientHeight + 1,
+      listScrollable: list.scrollHeight > list.clientHeight + 1,
+      footerBottom: footer.bottom,
+      badgeText: window.__badgeText,
+      badgeColor: window.__badgeColor,
+    };
+  });
+  assert.equal(popupLayout.rootScrollable, false, '根页面不得出现外层纵向滚动条');
+  assert.equal(popupLayout.listScrollable, true, '长列表应仅在任务容器内滚动');
+  assert.ok(popupLayout.footerBottom <= 600, '底部操作按钮不得被弹框裁切');
+  assert.equal(popupLayout.badgeText, '5', '打开弹框应恢复挂起任务徽标');
+  assert.equal(popupLayout.badgeColor, '#ef4444', '存在逾期任务时徽标应为红色');
+  await popup.page.screenshot({ path: path.join(ROOT, 'tools/debug-popup.png') });
   await popup.page.click('#openEditor');
   await popup.page.click('#edDatePicker .dp-trigger');
   await popup.page.waitForTimeout(500);

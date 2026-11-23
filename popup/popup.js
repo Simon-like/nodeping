@@ -6,6 +6,7 @@ import {
 } from '../shared/store.js';
 import { escapeHtml, renderTextWithLinks, normalizeUrl, domainOf, faviconUrl } from '../shared/ui.js';
 import { createDatePicker } from '../shared/date-picker.js';
+import { syncActionBadge } from '../shared/badge.js';
 
 const $ = sel => document.querySelector(sel);
 const datePicker = createDatePicker($('#edDatePicker'), { compact: true, inline: true });
@@ -28,6 +29,8 @@ const state = {
 async function refresh() {
   try {
     state.tasks = await getTasks();
+    // 弹框打开也主动恢复徽标，不依赖可能已休眠的后台服务。
+    syncActionBadge(state.tasks).catch(() => { /* 后台存储事件会重试 */ });
     renderCalendar();
     renderList();
     const info = await getStorageInfo();
