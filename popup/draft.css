@@ -1,0 +1,24 @@
+/* Popup 草稿场景：以长时间书写为中心的纸张式工作区 */
+.scene-tabs{flex:none;display:flex;gap:4px;margin:-3px 0 14px;border-bottom:1px solid rgba(30,58,95,.09)}
+.scene-tabs button{position:relative;min-width:64px;padding:7px 12px 10px;border:0;background:transparent;color:var(--ink);opacity:.45;font-size:12px;font-weight:700;cursor:pointer}
+.scene-tabs button::after{content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:2px;border-radius:2px;background:var(--accent);transform:scaleX(0);transition:transform .2s}
+.scene-tabs button.active{opacity:1}.scene-tabs button.active::after{transform:scaleX(1)}
+.popup.draft-open{height:600px;min-height:600px;display:flex;flex-direction:column}
+.draft-scene{flex:1;min-height:0;display:flex;flex-direction:column}
+.draft-toolbar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.draft-mode{display:flex;padding:3px;border-radius:9px;background:rgba(255,255,255,.4)}
+.draft-mode button{min-width:46px;padding:5px 9px;border:0;border-radius:7px;background:transparent;color:var(--ink);opacity:.5;font-size:11px;font-weight:650;cursor:pointer}
+.draft-mode button.active{background:#fff;opacity:1;box-shadow:0 2px 7px rgba(30,58,95,.09)}
+.draft-save-status{font-size:10px;color:var(--ink);opacity:.48;white-space:nowrap}.draft-save-status.saving{color:var(--accent);opacity:1}.draft-save-status.error{color:var(--danger);opacity:1}
+.draft-workspace{position:relative;flex:1;min-height:0;display:flex;border:1px solid rgba(255,255,255,.8);border-radius:15px;background:rgba(255,255,255,.52);box-shadow:0 6px 22px rgba(31,38,135,.06);overflow:hidden}
+#draftEditor{width:100%;height:100%;min-height:0;padding:17px 16px;border:0;outline:0;resize:none;background:transparent;color:var(--ink);font:13px/1.85 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"PingFang SC","Microsoft YaHei",monospace;caret-color:var(--accent);tab-size:2}
+#draftEditor::placeholder{color:var(--ink);opacity:.32}
+#draftEditor:focus{background:rgba(255,255,255,.24)}
+.draft-preview{width:100%;height:100%;overflow-y:auto;padding:16px 17px;color:var(--ink);font-size:13px;line-height:1.75;overflow-wrap:anywhere}
+.draft-preview:empty::before{content:"还没有内容，回到编辑页写下第一条想法。";font-size:12px;opacity:.4}
+.draft-preview h1,.draft-preview h2,.draft-preview h3{margin:13px 0 7px;line-height:1.4;letter-spacing:-.3px}.draft-preview h1:first-child,.draft-preview h2:first-child,.draft-preview h3:first-child{margin-top:0}.draft-preview h1{font-size:19px}.draft-preview h2{font-size:16px}.draft-preview h3{font-size:14px}
+.draft-preview p{margin:8px 0}.draft-preview ul,.draft-preview ol{margin:7px 0;padding-left:22px}.draft-preview li{padding-left:2px;margin:3px 0}.draft-preview strong{font-weight:750;color:#153b68}.draft-preview blockquote{margin:10px 0;padding:7px 11px;border-left:2px solid var(--accent);background:var(--accent-soft);border-radius:0 8px 8px 0;opacity:.78}.draft-preview code{padding:2px 5px;border-radius:5px;background:rgba(30,58,95,.08);font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}.draft-preview pre{margin:10px 0;padding:11px;border-radius:9px;background:#1e3a5f;overflow:auto}.draft-preview pre code{padding:0;background:transparent;color:#eef6ff}.draft-preview a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(59,130,246,.3)}.draft-preview hr{margin:14px 0;border:0;border-top:1px solid rgba(30,58,95,.12)}
+.draft-error{flex:none;margin-top:8px;padding:8px 10px;border-radius:9px;background:#fff0f0;color:#b92c2c;font-size:10px;line-height:1.5}
+.draft-meta{flex:none;display:flex;justify-content:space-between;gap:8px;padding:9px 2px 8px;color:var(--ink);font-size:9px;opacity:.45}.draft-meta span:last-child{text-align:right}
+.draft-actions{flex:none;display:flex;align-items:center;gap:10px}.draft-actions .btn{flex:1;padding:10px 12px;font-size:12px}.draft-actions .btn span{margin-left:5px;font-size:9px;opacity:.65}.draft-clear{padding:8px 10px;border:0;background:transparent;color:var(--ink);opacity:.4;font-size:11px;cursor:pointer}.draft-clear:hover{color:var(--danger);opacity:1}
+@media(prefers-reduced-motion:reduce){.scene-tabs button::after{transition:none}}

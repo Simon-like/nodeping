@@ -15,6 +15,9 @@ NodePing 是一个 Chrome 扩展（Manifest V3），用来对抗"Mac 日历太�
 ## 🚀 功能
 
 - **Popup 弹窗**（点击图标）：日 / 周 / 月三视图截止日预览 + 挂起列表 + 底部滑出式轻量编辑器
+- **Markdown 草稿**：独立编辑 / 预览场景，支持标题、列表、粗体、引用、代码与安全链接；600ms 自动保存 + 手动保存
+- **草稿快捷输入**：`1.` + 空格创建有序列表，Enter 自动编号，`Cmd/Ctrl+B` 加粗或取消加粗，`Cmd/Ctrl+S` 立即保存
+- **草稿存储管理**：使用本机大容量存储，不占任务同步空间；显示字数与容量，保存失败保留文本，清空需确认
 - **点击卡片即编辑**：新增、修改、完成一气呵成
 - **相关链接**：任务可挂多条链接，后台自动抓取页面标题（Open Graph / `<title>`），卡片上以「favicon + 标题」胶囊展示，点击直达
 - **详情自动链接化**：备注里的 URL 自动高亮可点击
@@ -43,7 +46,7 @@ NodePing 是一个 Chrome 扩展（Manifest V3），用来对抗"Mac 日历太�
 | 平台 | Chrome Extension Manifest V3 |
 | 视图 | 原生 HTML / CSS（设计变量 + backdrop-filter） |
 | 逻辑 | 原生 ES Modules（Popup / Options / Service Worker） |
-| 存储 | `chrome.storage.sync` |
+| 存储 | 任务使用 `chrome.storage.sync` 分段同步；草稿使用 `chrome.storage.local` 本机保存 |
 | 后台 | Service Worker：角标维护、定时刷新、链接标题抓取 |
 | 权限 | `storage` `alarms` `favicon` + 可选 `host_permissions`（添加链接时动态申请） |
 
@@ -52,9 +55,9 @@ NodePing 是一个 Chrome 扩展（Manifest V3），用来对抗"Mac 日历太�
 ```
 ├── manifest.json        # MV3 清单
 ├── background/sw.js     # 角标 / 定时刷新 / 链接标题抓取
-├── popup/               # 工具栏弹窗（385px）
+├── popup/               # 工具栏弹窗（385px）与 Markdown 草稿
 ├── options/             # 管理页（月历 + CRUD + 归档）
-├── shared/              # 数据层（挂起模型）与 UI 工具
+├── shared/              # 数据层、Markdown 解析与 UI 工具
 ├── icons/               # 扩展图标
 ├── docs/                # 产品立项报告
 ├── prototype/           # 交互原型存档
@@ -63,7 +66,7 @@ NodePing 是一个 Chrome 扩展（Manifest V3），用来对抗"Mac 日历太�
 
 ## 🔒 隐私
 
-数据只存在你自己的 Chrome Sync 存储里，不经过任何第三方服务器。链接标题抓取由扩展在本机直接完成。
+任务记录只存在你自己的 Chrome Sync 存储里，草稿只存在当前设备的 Chrome 本机存储里，均不经过第三方服务器。链接标题抓取由扩展在本机直接完成。草稿不会随 Google 账号同步到其他设备。
 
 ## 🗺 Roadmap
 
@@ -71,6 +74,7 @@ NodePing 是一个 Chrome 扩展（Manifest V3），用来对抗"Mac 日历太�
 - [x] 弹窗内编辑节点（v0.2）
 - [x] 相关链接 + 标题预览（v0.2）
 - [x] 分段同步 + 归档保留策略 + 统计复盘 + 统一日期选择器（v0.3）
+- [x] Markdown 草稿 + 自动保存 + 列表与加粗快捷键（v0.4）
 - [ ] 管理页详情 Markdown 渲染
 - [ ] 临期桌面通知（chrome.notifications）
 - [ ] 上架 Chrome Web Store

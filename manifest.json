@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NodePing",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "住在浏览器工具栏上的工作关键节点提示器——节点挂起后不走，直到你干掉它。",
   "permissions": ["storage", "alarms", "favicon"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],

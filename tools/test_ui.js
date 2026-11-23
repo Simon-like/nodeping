@@ -49,7 +49,10 @@ async function createPage(browser, file) {
       'nodeping.tasks.v1': structuredClone(tasks),
       'nodeping.settings.v1': { autoCleanup: false, archiveRetentionDays: 90 },
     };
+    const localData = JSON.parse(localStorage.getItem('__nodepingDraftMock') || '{}');
+    const persistLocal = () => localStorage.setItem('__nodepingDraftMock', JSON.stringify(localData));
     window.__mockData = data;
+    window.__mockLocal = localData;
     window.__failWrites = false;
     window.chrome = {
       runtime: { id: 'nodeping-test', openOptionsPage() {} },
@@ -71,6 +74,13 @@ async function createPage(browser, file) {
           },
           async remove(keys) { for (const key of Array.isArray(keys) ? keys : [keys]) delete data[key]; },
           async getBytesInUse() { return new TextEncoder().encode(JSON.stringify(data)).length; },
+        },
+        local: {
+          QUOTA_BYTES: 10 * 1024 * 1024,
+          async get(key) { return key in localData ? { [key]: structuredClone(localData[key]) } : {}; },
+          async set(values) { Object.assign(localData, structuredClone(values)); persistLocal(); },
+          async remove(key) { delete localData[key]; persistLocal(); },
+          async getBytesInUse(key) { return localData[key] ? new TextEncoder().encode(JSON.stringify(localData[key])).length : 0; },
         },
         onChanged: { addListener() {} },
       },
@@ -136,6 +146,42 @@ try {
   assert.match(await popup.page.locator('#edError').textContent(), /空间不足/);
   assert.equal(await popup.page.inputValue('#edTitle'), '写满时不能丢的内容');
   await popup.page.screenshot({ path: path.join(ROOT, 'tools/debug-popup-new.png') });
+
+  await popup.page.click('[data-scene="draft"]');
+  await popup.page.fill('#draftEditor', '# 想法\n\n1. 第一项');
+  await popup.page.evaluate(() => {
+    const editor = document.querySelector('#draftEditor');
+    editor.setSelectionRange(editor.value.length, editor.value.length);
+  });
+  await popup.page.press('#draftEditor', 'Enter');
+  await popup.page.type('#draftEditor', '第二项');
+  assert.match(await popup.page.inputValue('#draftEditor'), /2\. 第二项$/);
+  await popup.page.evaluate(() => {
+    const editor = document.querySelector('#draftEditor');
+    const start = editor.value.lastIndexOf('第二项');
+    editor.setSelectionRange(start, start + 3);
+  });
+  await popup.page.press('#draftEditor', 'Meta+B');
+  assert.match(await popup.page.inputValue('#draftEditor'), /2\. \*\*第二项\*\*$/);
+  await popup.page.waitForTimeout(750);
+  assert.match(await popup.page.locator('#draftSaveStatus').textContent(), /已保存/, '停止输入后应自动保存');
+  assert.match(await popup.page.evaluate(() => window.__mockLocal['nodeping.draft.v1'].text), /\*\*第二项\*\*/);
+  await popup.page.click('#draftSave');
+  await popup.page.waitForTimeout(150);
+  assert.match(await popup.page.locator('#draftSaveStatus').textContent(), /已保存/);
+  assert.match(await popup.page.evaluate(() => window.__mockLocal['nodeping.draft.v1'].text), /\*\*第二项\*\*/);
+  await popup.page.click('[data-mode="preview"]');
+  assert.equal(await popup.page.locator('#draftPreview h1').textContent(), '想法');
+  assert.equal(await popup.page.locator('#draftPreview ol li').count(), 2);
+  assert.equal(await popup.page.locator('#draftPreview strong').textContent(), '第二项');
+  await popup.page.screenshot({ path: path.join(ROOT, 'tools/debug-draft-preview.png') });
+  await popup.page.click('[data-mode="edit"]');
+  await popup.page.screenshot({ path: path.join(ROOT, 'tools/debug-draft-editor.png') });
+  await popup.page.reload();
+  await popup.page.click('[data-scene="draft"]');
+  await popup.page.waitForTimeout(150);
+  assert.match(await popup.page.inputValue('#draftEditor'), /1\. 第一项\n2\. \*\*第二项\*\*/);
+  assert.match(await popup.page.locator('#draftStorage').textContent(), /本机/);
   assert.deepEqual(popup.errors, []);
   await popup.context.close();
 

@@ -6,6 +6,7 @@ import {
 } from '../shared/store.js';
 import { escapeHtml, renderTextWithLinks, normalizeUrl, domainOf, faviconUrl } from '../shared/ui.js';
 import { createDatePicker } from '../shared/date-picker.js';
+import { initDraft, openDraft } from './draft.js';
 import { syncActionBadge } from '../shared/badge.js';
 
 const $ = sel => document.querySelector(sel);
@@ -369,6 +370,19 @@ const openOptions = () => chrome.runtime.openOptionsPage();
 $('#openOptions').onclick = openOptions;
 $('#gotoOptions').onclick = openOptions;
 $('#storageNotice').onclick = openOptions;
+
+initDraft();
+$('#sceneTabs').querySelectorAll('button').forEach(btn => {
+  btn.onclick = () => {
+    const draftMode = btn.dataset.scene === 'draft';
+    if (draftMode) closeEditor();
+    $('#sceneTabs').querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+    $('#tasksScene').classList.toggle('hidden', draftMode);
+    $('#draftScene').classList.toggle('hidden', !draftMode);
+    $('#popupRoot').classList.toggle('draft-open', draftMode);
+    if (draftMode) openDraft();
+  };
+});
 
 $('#viewTabs').querySelectorAll('button').forEach(btn => {
   btn.onclick = () => {

@@ -4,65 +4,59 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="../shared/date-picker.css">
 <link rel="stylesheet" href="popup.css">
+<link rel="stylesheet" href="draft.css">
 <title>NodePing</title>
 </head>
 <body>
-  <div class="popup">
+  <div class="popup" id="popupRoot">
     <div class="pop-head">
       <div class="pop-title">◈ NodePing</div>
       <button class="gear" id="openOptions" title="管理页" aria-label="打开管理页">⚙︎</button>
     </div>
 
-    <button class="storage-notice hidden" id="storageNotice" title="打开存储管理"></button>
-
-    <div class="view-tabs" id="viewTabs">
-      <button data-view="day">日</button>
-      <button data-view="week" class="active">周</button>
-      <button data-view="month">月</button>
+    <div class="scene-tabs" id="sceneTabs" aria-label="功能场景">
+      <button class="active" data-scene="tasks">节点</button>
+      <button data-scene="draft">草稿</button>
     </div>
 
-    <div class="cal-area" id="calArea"></div>
-    <div class="filter-chip hidden" id="filterChip"><span id="filterText"></span><button id="filterClear" title="查看全部">×</button></div>
-
-    <div class="hang-head">
-      <span class="hang-title">挂起中</span>
-      <span class="hang-count" id="hangCount">0</span>
-      <span class="hang-hint">完成或取消前不会消失</span>
+    <div class="scene-panel" id="tasksScene">
+      <button class="storage-notice hidden" id="storageNotice" title="打开存储管理"></button>
+      <div class="view-tabs" id="viewTabs"><button data-view="day">日</button><button data-view="week" class="active">周</button><button data-view="month">月</button></div>
+      <div class="cal-area" id="calArea"></div>
+      <div class="filter-chip hidden" id="filterChip"><span id="filterText"></span><button id="filterClear" title="查看全部">×</button></div>
+      <div class="hang-head"><span class="hang-title">挂起中</span><span class="hang-count" id="hangCount">0</span><span class="hang-hint">完成或取消前不会消失</span></div>
+      <div class="list-wrap" id="listWrap"><div class="task-list" id="taskList"></div><button class="more-hint" id="moreHint">还有 <span id="moreCount">0</span> 条 ↓</button></div>
+      <div class="empty hidden" id="emptyState"><div class="empty-icon">🍃</div><div>没有挂起的节点，很清净</div></div>
+      <div class="pop-foot"><button class="btn btn-primary" id="openEditor">＋ 新增节点</button><button class="btn btn-ghost" id="gotoOptions">管理页 →</button></div>
     </div>
 
-    <div class="list-wrap" id="listWrap">
-      <div class="task-list" id="taskList"></div>
-      <button class="more-hint" id="moreHint">还有 <span id="moreCount">0</span> 条 ↓</button>
-    </div>
-    <div class="empty hidden" id="emptyState"><div class="empty-icon">🍃</div><div>没有挂起的节点，很清净</div></div>
+    <section class="scene-panel draft-scene hidden" id="draftScene" aria-label="Markdown 草稿">
+      <div class="draft-toolbar">
+        <div class="draft-mode" id="draftMode"><button class="active" data-mode="edit">编辑</button><button data-mode="preview">预览</button></div>
+        <span class="draft-save-status" id="draftSaveStatus">本机自动保存</span>
+      </div>
+      <div class="draft-workspace">
+        <textarea id="draftEditor" placeholder="把脑子里的想法先放在这里……
 
-    <div class="pop-foot">
-      <button class="btn btn-primary" id="openEditor">＋ 新增节点</button>
-      <button class="btn btn-ghost" id="gotoOptions">管理页 →</button>
-    </div>
+1. 输入“1. + 空格”开始列表
+2. 回车自动编号
+3. Cmd/Ctrl + B 加粗" spellcheck="true" aria-label="草稿编辑区"></textarea>
+        <article class="draft-preview hidden" id="draftPreview"></article>
+      </div>
+      <div class="draft-error hidden" id="draftError" role="alert"></div>
+      <div class="draft-meta"><span id="draftCount">0 字</span><span id="draftStorage">本机存储 · 不占同步空间</span></div>
+      <div class="draft-actions"><button class="draft-clear" id="draftClear">清空</button><button class="btn btn-primary" id="draftSave">保存草稿 <span>⌘S</span></button></div>
+    </section>
 
     <div class="editor" id="editor">
       <input class="ed-title-input" id="edTitle" placeholder="节点标题，如：支付对账上线" maxlength="40">
-      <div class="ed-row ed-date-row">
-        <span class="ed-label">截止</span>
-        <div class="ed-date-picker" id="edDatePicker"></div>
-      </div>
-      <div class="ed-row">
-        <span class="ed-label">项目</span>
-        <input class="ed-proj" id="edProj" placeholder="选填" maxlength="10">
-      </div>
+      <div class="ed-row ed-date-row"><span class="ed-label">截止</span><div class="ed-date-picker" id="edDatePicker"></div></div>
+      <div class="ed-row"><span class="ed-label">项目</span><input class="ed-proj" id="edProj" placeholder="选填" maxlength="10"></div>
       <textarea class="ed-detail" id="edDetail" rows="2" placeholder="详情备注（选填，一句话即可）" maxlength="120"></textarea>
-      <div class="ed-row">
-        <span class="ed-label">链接</span>
-        <input class="ed-link-input" id="edLinkInput" placeholder="粘贴 URL，回车添加" maxlength="300">
-        <button class="chip" id="edLinkAdd">添加</button>
-      </div>
+      <div class="ed-row"><span class="ed-label">链接</span><input class="ed-link-input" id="edLinkInput" placeholder="粘贴 URL，回车添加" maxlength="300"><button class="chip" id="edLinkAdd">添加</button></div>
       <div class="ed-links" id="edLinks"></div>
       <div class="ed-error hidden" id="edError" role="alert"></div>
-      <div class="ed-actions">
-        <button class="btn btn-primary" id="edSave">挂起它</button>
-        <button class="btn btn-ghost" id="edCancel">取消</button>
-      </div>
+      <div class="ed-actions"><button class="btn btn-primary" id="edSave">挂起它</button><button class="btn btn-ghost" id="edCancel">取消</button></div>
     </div>
   </div>
   <script type="module" src="popup.js"></script>
